@@ -349,7 +349,7 @@ Default windows may return:
 
 This behavior is expected when no activity exists. Additionally, any endpoint under `/stats/` will return an empty array (`[]`) unless the required query parameters are provided.
 
-Be sure to include the following query parameters when making requests (already include in this tool):
+Be sure to include the following query parameters when making requests (already included in this tool):
 
 * `page` and `per_page` for pagination
 * `from` and `to` to define the time range
