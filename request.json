@@ -1,0 +1,123 @@
+{
+  "validity": {
+    "not_before": 1477958400,
+    "not_after": 1509494400
+  },
+  "subject_dn": {
+    "common_name": "John Doe",
+    "surname": "Doe",
+    "given_name": "John",
+    "country": "GB",
+    "state": "London",
+    "locality": "London",
+    "street_address": "1 GlobalSign Road",
+    "postal_code": "E1",
+    "organization": "GMO GlobalSign",
+    "organizational_unit": [
+      "Operations",
+      "Development"
+    ],
+    "organization_identifier": "PSDFI-FINFSA-29884997",
+    "email": "john.doe@demo.hvca.globalsign.com",
+    "pseudonym": "whatshisname",
+    "jurisdiction_of_incorporation_locality_name": "London",
+    "jurisdiction_of_incorporation_state_or_province_name": "London",
+    "jurisdiction_of_incorporation_country_name": "United Kingdom",
+    "business_category": "Internet security",
+    "serial_number": "AA0448C4AE22702EF2C7A9BD7FA09743",
+    "extra_attributes": [
+      {
+        "type": "2.5.4.43",
+        "value": "GS"
+      }
+    ]
+  },
+  "san": {
+    "dns_names": [
+      "test.demo.hvca.globalsign.com",
+      "test2.demo.hvca.globalsign.com"
+    ],
+    "ip_addresses": [
+      "198.41.214.154"
+    ],
+    "uris": [
+      "http://test.demo.hvca.globalsign.com/uri"
+    ],
+    "emails": [
+      "admin@demo.hvca.globalsign.com",
+      "contact@demo.hvca.globalsign.com"
+    ],
+    "other_names": [
+      {
+        "type": "1.3.6.1.4.1.311.20.2.3",
+        "value": "upn@demo.hvca.globalsign.com"
+      }
+    ]
+  },
+  "subject_da": {
+    "gender": "m",
+    "date_of_birth": "1979-01-31",
+    "place_of_birth": "London",
+    "country_of_citizenship": [
+      "GB",
+      "US"
+    ],
+    "country_of_residence": [
+      "US"
+    ],
+    "extra_attributes": [
+      {
+        "type": "2.5.29.9.1.1.1"
+      },
+      {
+        "type": "2.5.29.9.1.1.2",
+        "value": "custom subject da value"
+      }
+    ]
+  },
+  "key_usages": {
+    "digital_signature": true,
+    "content_commitment": false,
+    "key_encipherment": true,
+    "data_encipherment": false,
+    "key_agreement": true,
+    "key_certificate_sign": false,
+    "crl_sign": false,
+    "encipher_only": true,
+    "decipher_only": true
+  },
+  "extended_key_usages": [
+    "1.3.6.1.5.5.7.3.1",
+    "1.3.6.1.5.5.7.3.2"
+  ],
+  "qualified_statements": {
+    "semantics": {
+      "identifier": "1.1.1.1.1.1",
+      "name_authorities": [
+        "contact@ra1.globalsign.com"
+      ]
+    },
+    "etsi_qc_compliance": true,
+    "etsi_qc_type": "0.4.0.1862.1.6.1",
+    "etsi_qc_sscd_compliance": true,
+    "etsi_qc_retention_period": 1,
+    "etsi_qc_pds": {
+      "EN": "https://demo.globalsign.com/en/pds"
+    }
+  },
+  "ms_extension_template": {
+    "id": "1.2.3.4.123.4.5.1",
+    "major_version": 1,
+    "minor_version": 2
+  },
+  "custom_extensions": {
+    "2.5.29.99.1": "NIL",
+    "2.5.29.99.2": "SOME TEXT"
+  },
+  "signature": {
+    "algorithm": "RSA-PSS",
+    "hash_algorithm": "SHA-256"
+  },
+  "public_key": "-----BEGIN PUBLIC KEY-----\\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwU2imlDf02o8DPveLN73\\nwbrQKScch9AnkMuQqBxxq5YBUAvPDXYeeA8tkgk+N2Q5FNL/BXI0m1QTlq8FbdAQ\\nKkpi93vimsymHpkBFTxZSqMcI55vyLanjfMOnZ7Xbgq0hhub/K6FZpFCJ2oqoLwr\\nY5hBYAGYQco5qw4nbR9Mpeu41QGQzrGjYIKNOVgXh/m41FOGDsQntecaLAluTg+E\\n/Qmb8U7XZVBn3/DPyiXrfobuBlnmEbPjQ95LAvRLzcHzWY0YB1dfGzbcK1PaGRLE\\nod2C1QCGK+YWzeUWEyHqgNEncQDMFYFKUd1IhR6OSmVB1ukXa0y8eZBVWsoxXr2X\\nlQIDAQAB\\n-----END PUBLIC KEY-----",
+  "public_key_signature": "MIGIAkIA6CotF+LAs2MeymHWul2KuatxcqWDpvhgaEJCI+joyj7p9XEUyH5pBTJ2VqvO0hKYEm+dZl8KKD7ISHWz8Vfb9cECQgFwaB7u/5cw4kT5gv9BPTlxCSiZRlRPVbTbYWl/BeaWAwrt3oEqDuHXOwIQscj/887bBEN/SnYGpKkKe/qdKEd0gw=="
+}
