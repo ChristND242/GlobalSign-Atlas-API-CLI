@@ -710,7 +710,7 @@ It is built for:
 
 # License
 
-Internal / Project Use
+Project Use
 
 ```
 
