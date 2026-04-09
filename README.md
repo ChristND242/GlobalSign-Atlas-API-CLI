@@ -4,7 +4,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Linux-informational.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Status](https://img.shields.io/badge/Status-Active-success.svg)
-![API](https://img.shields.io/badge/API-GlobalSign%20Atlas-blue.svg)
+[![API](https://img.shields.io/badge/API-GlobalSign%20Atlas-blue.svg)](https://api.docs.globalsign.com/)
 
 A production-ready Bash CLI for interacting with the GlobalSign Atlas Certificate Management API.
 
