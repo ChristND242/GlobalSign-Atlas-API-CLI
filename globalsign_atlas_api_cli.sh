@@ -16,6 +16,7 @@ set -euo pipefail
 # =========================
 # Config
 # =========================
+
 BASE_URL="${BASE_URL:-https://emea.api.hvca.globalsign.com:8443/v2}"
 MTLS_CERT="${MTLS_CERT:-yourmTLShere.pem}"
 MTLS_KEY="${MTLS_KEY:-yourmTLSprivatekeyhere.key}"
@@ -32,9 +33,10 @@ IP_CLAIMS_BASE="${IP_CLAIMS_BASE:-/claims/ipaddresses}"
 
 mkdir -p "$OUT_DIR"
 
-# =========================
+# ========================= 
 # Runtime vars
 # =========================
+
 LOGIN_BODY=""
 RESP_BODY=""
 RESP_HEADERS=""
@@ -48,6 +50,7 @@ HTTP_CODE=""
 # =========================
 # ANSI Colors
 # =========================
+
 RESET='\033[0m'
 BOLD='\033[1m'
 DIM='\033[2m'
@@ -60,6 +63,7 @@ CYAN='\033[36m'
 # =========================
 # Helpers
 # =========================
+
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
     echo "Missing required command: $1" >&2
@@ -69,7 +73,8 @@ require_cmd() {
 
 cleanup() {
   rm -f "${LOGIN_BODY:-}" "${RESP_BODY:-}" "${RESP_HEADERS:-}" \
-        "${ISSUE_BODY:-}" "${ISSUE_HEADERS:-}" "${CERT_BODY:-}" "${CHAIN_BODY:-}"
+        "${ISSUE_BODY:-}" "${ISSUE_HEADERS:-}" "${CERT_BODY:-}" "${CHAIN_BODY:-}" \
+        "${NORMALIZED_REQUEST_JSON:-}" "${REISSUE_JSON:-}"
 }
 trap cleanup EXIT
 
@@ -199,8 +204,9 @@ ensure_config() {
   require_cmd awk
   require_cmd tr
   require_cmd sed
+  require_cmd python3
 
-  prompt_if_empty BASE_URL "Enter BASE_URL [e.g. https://emea.api.hvca.globalsign.com:8443/v2]"
+  prompt_if_empty BASE_URL "Enter BASE_URL [e.g. https://stg-emea.api.hvca.globalsign.com:8443/v2]"
   prompt_if_empty MTLS_CERT "Enter path to mTLS certificate file"
   prompt_if_empty MTLS_KEY "Enter path to mTLS private key file"
   prompt_if_empty API_KEY "Enter your API_KEY" true
@@ -294,6 +300,7 @@ read_nonempty() {
 # =========================
 # Shared login/api
 # =========================
+
 login() {
   LOGIN_BODY="$(mktemp)"
 
@@ -401,8 +408,58 @@ api_call() {
 # }
 
 # =========================
+# Json parsing
+# =========================
+
+normalize_request_json() {
+  local input_file="$1"
+  local output_file="$2"
+  local now_utc="$3"
+  local not_after_utc="${4:-}"
+
+  python3 - "$input_file" "$output_file" "$now_utc" "$not_after_utc" <<'PY'
+import sys
+import re
+import json
+
+input_file = sys.argv[1]
+output_file = sys.argv[2]
+now_utc = int(sys.argv[3])
+not_after_raw = sys.argv[4].strip()
+
+with open(input_file, "r", encoding="utf-8") as f:
+    raw = f.read()
+
+# Normalize raw multiline public_key into a valid JSON string
+pattern = r'("public_key"\s*:\s*")(.+?)(")'
+match = re.search(pattern, raw, flags=re.DOTALL)
+
+if match:
+    prefix, value, suffix = match.groups()
+    escaped_value = json.dumps(value)[1:-1]
+    raw = raw[:match.start()] + prefix + escaped_value + suffix + raw[match.end():]
+
+data = json.loads(raw)
+
+data.setdefault("validity", {})
+data["validity"]["not_before"] = now_utc
+
+# Only inject not_after when provided and > 0
+if not_after_raw and not_after_raw != "0":
+    data["validity"]["not_after"] = int(not_after_raw)
+else:
+    data["validity"].pop("not_after", None)
+
+with open(output_file, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+PY
+}
+
+# =========================
 # Issuing certificates
 # =========================
+
 auto_issuance() {
   section_header "Issuing Certificates"
 
@@ -425,7 +482,39 @@ auto_issuance() {
     return 0
   }
 
-  print_info "Submitting certificate request from: $REQUEST_JSON"
+  # ============================================================
+  # Inject current UTC Unix timestamp into request.json
+  # ============================================================
+
+  local NOW_UTC NORMALIZED_REQUEST_JSON NOT_AFTER_DAYS NOT_AFTER_UTC
+  NOW_UTC="$(date -u +%s)"
+  NORMALIZED_REQUEST_JSON="$(mktemp)"
+
+  read -r -p "Enter certificate validity in days for not_after [blank = default max policy]: " NOT_AFTER_DAYS
+
+  NOT_AFTER_UTC=""
+  if [[ -n "${NOT_AFTER_DAYS:-}" && "$NOT_AFTER_DAYS" != "0" ]]; then
+    if [[ ! "$NOT_AFTER_DAYS" =~ ^[0-9]+$ ]]; then
+      print_err "not_after days must be a whole number."
+      pause
+      return 0
+    fi
+    NOT_AFTER_UTC="$((NOW_UTC + NOT_AFTER_DAYS * 86400))"
+  fi
+
+  if ! normalize_request_json "$REQUEST_JSON" "$NORMALIZED_REQUEST_JSON" "$NOW_UTC" "$NOT_AFTER_UTC"; then
+    print_err "Failed to normalize and update $REQUEST_JSON"
+    pause
+    return 0
+  fi
+
+  print_info "Injected not_before (UTC): $NOW_UTC"
+  if [[ -n "$NOT_AFTER_UTC" ]]; then
+    print_info "Injected not_after (UTC): $NOT_AFTER_UTC (${NOT_AFTER_DAYS} day(s))"
+  else
+    print_info "not_after left unset; Atlas will use validation policy maximum"
+  fi
+  print_info "Using temp request file: $NORMALIZED_REQUEST_JSON"
 
   local issue_http_code
   issue_http_code="$(
@@ -438,7 +527,7 @@ auto_issuance() {
       -H "Content-Type: application/json; charset=utf-8" \
       -H "Accept: application/json" \
       -H "Authorization: Bearer $ACCESS_TOKEN" \
-      --data-binary @"$REQUEST_JSON" \
+      --data-binary @"$NORMALIZED_REQUEST_JSON" \
       "$BASE_URL/certificates"
   )"
 
@@ -486,9 +575,9 @@ auto_issuance() {
   fi
 
   space
-  print_ok "Certificate request accepted"
-  print_kv "Certificate URL" "$cert_url"
-  print_kv "Certificate serial" "$cert_serial"
+  print_ok " Certificate request accepted"
+  print_kv " Certificate URL" "$cert_url"
+  print_kv " Certificate serial" "$cert_serial"
   divider
   space
 
@@ -544,7 +633,7 @@ auto_issuance() {
         cert_ready=1
         space
         divider
-        print_ok "Certificate saved to: $cert_file"
+        print_ok " Certificate saved to: $cert_file"
         divider
         break
       fi
@@ -620,14 +709,14 @@ auto_issuance() {
   cat "$cert_file" "$chain_file" > "$fullchain_file"
 
   space
-  print_ok "Certificate issuance workflow completed"
+  print_ok " Certificate issuance workflow completed"
   divider
-  print_kv "Certificate serial" "$cert_serial"
-  print_kv "Certificate file" "$cert_file"
-  print_kv "Chain file" "$chain_file"
-  print_kv "Fullchain file" "$fullchain_file"
-  print_kv "Cert JSON" "$cert_json_file"
-  print_kv "Chain JSON" "$chain_json_file"
+  print_kv " Certificate serial" "$cert_serial"
+  print_kv " Certificate file" "$cert_file"
+  print_kv " Chain file" "$chain_file"
+  print_kv " Fullchain file" "$fullchain_file"
+  print_kv " Cert JSON" "$cert_json_file"
+  print_kv " Chain JSON" "$chain_json_file"
   space
   divider
   pause
@@ -645,7 +734,39 @@ request_new_certificate() {
 
   login || { pause; return 0; }
 
-  print_info "Submitting certificate request from: $REQUEST_JSON"
+  # ============================================================
+  # Inject current UTC Unix timestamp into request.json
+  # ============================================================
+
+  local NOW_UTC NORMALIZED_REQUEST_JSON NOT_AFTER_DAYS NOT_AFTER_UTC
+  NOW_UTC="$(date -u +%s)"
+  NORMALIZED_REQUEST_JSON="$(mktemp)"
+
+  read -r -p "Enter certificate validity in days for not_after [blank = default max policy]: " NOT_AFTER_DAYS
+
+  NOT_AFTER_UTC=""
+  if [[ -n "${NOT_AFTER_DAYS:-}" && "$NOT_AFTER_DAYS" != "0" ]]; then
+    if [[ ! "$NOT_AFTER_DAYS" =~ ^[0-9]+$ ]]; then
+      print_err "not_after days must be a whole number."
+      pause
+      return 0
+    fi
+    NOT_AFTER_UTC="$((NOW_UTC + NOT_AFTER_DAYS * 86400))"
+  fi
+
+  if ! normalize_request_json "$REQUEST_JSON" "$NORMALIZED_REQUEST_JSON" "$NOW_UTC" "$NOT_AFTER_UTC"; then
+    print_err "Failed to normalize and update $REQUEST_JSON"
+    pause
+    return 0
+  fi
+
+  print_info "Injected not_before (UTC): $NOW_UTC"
+  if [[ -n "$NOT_AFTER_UTC" ]]; then
+    print_info "Injected not_after (UTC): $NOT_AFTER_UTC (${NOT_AFTER_DAYS} day(s))"
+  else
+    print_info "not_after left unset; Atlas will use validation policy maximum"
+  fi
+  print_info "Using temp request file: $NORMALIZED_REQUEST_JSON"
 
   RESP_BODY="$(mktemp)"
   RESP_HEADERS="$(mktemp)"
@@ -660,7 +781,7 @@ request_new_certificate() {
       -H "Content-Type: application/json; charset=utf-8" \
       -H "Accept: application/json" \
       -H "Authorization: Bearer $ACCESS_TOKEN" \
-      --data-binary @"$REQUEST_JSON" \
+      --data-binary @"$NORMALIZED_REQUEST_JSON" \
       "$BASE_URL/certificates"
   )"
 
@@ -693,6 +814,28 @@ get_certificate_by_id() {
   login || { pause; return 0; }
   api_call GET "/certificates/$cert_id" "" "Retrieving certificate"
   print_response
+
+  if [[ "$HTTP_CODE" == "200" && -s "$RESP_BODY" ]]; then
+    local cert_pem cert_file cert_json_file
+    cert_pem="$(jq -r '.certificate // empty' "$RESP_BODY")"
+
+    cert_json_file="$OUT_DIR/${cert_id}.json"
+    cp "$RESP_BODY" "$cert_json_file"
+
+    if [[ -n "$cert_pem" && "$cert_pem" != "null" ]]; then
+      cert_file="$OUT_DIR/${cert_id}.crt"
+      printf '%s\n' "$cert_pem" > "$cert_file"
+
+      echo
+      print_ok " Certificate saved to: $cert_file"
+      print_kv " Certificate JSON" "$cert_json_file"
+    else
+      echo
+      print_warn "No certificate PEM found in response."
+      print_kv " Response JSON saved to" "$cert_json_file"
+    fi
+  fi
+
   pause
   return 0
 }
@@ -840,6 +983,7 @@ retrieve_trust_chain() {
 # =========================
 # Certificate checks
 # =========================
+
 check_validation_policy() {
   section_header "Checking Certificates :: Validation Policy"
   login || { pause; return 1; }
@@ -908,6 +1052,7 @@ check_issuance_quota() {
 # =========================
 # Domain claims
 # =========================
+
 claim_domain() {
   section_header "Claim a Domain"
   local domain
@@ -1082,6 +1227,7 @@ list_domain_claims() {
 # =========================
 # IP claims
 # =========================
+
 list_ip_claims() {
   section_header "List IP Address Claims"
   login || { pause; return 1; }
@@ -1185,6 +1331,7 @@ reassert_ip_claim() {
 # =========================
 # Menus
 # =========================
+
 show_main_menu() {
   section_header "Main Menu"
   cat <<'EOF'
@@ -1261,7 +1408,7 @@ EOF
 issuance_menu() {
   while true; do
     show_issuance_menu
-    read -r -p "Select an option [1-6]: " choice
+    read -r -p "Select an option [1-7]: " choice
 
     case "$choice" in
       1) auto_issuance || true ;;
