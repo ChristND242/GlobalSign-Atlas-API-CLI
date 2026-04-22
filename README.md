@@ -49,6 +49,7 @@ Please note that this is a personal initiative created to support the community.
 - PEM Formatting Requirements
 - Error Handling and Debugging
 - Operational Best Practices
+- Updates
 
 
 
@@ -97,6 +98,7 @@ Failures:
 - Bash (Linux / macOS / WSL)
 - `curl`
 - `jq`
+- `python3`
 - `openssl`
 
 You must have:
@@ -686,14 +688,276 @@ For more detailed information, please refer to the official GlobalSign API docum
 
 The documentation provides comprehensive guidance on available endpoints, required parameters, authentication methods, and usage examples for the Atlas API. [api.docs.globalsign.com][1]
 
-# Operational Best Practices
 
-* Always validate CSR/public key before submission
-* Use Auto Issuance for production
-* Use manual flows for debugging
-* Store outputs securely
-* Rotate keys regularly
-* Monitor revocation events
+# Enhancement Update
+
+This update introduces a fully automated, production-grade workflow for certificate issuance and retrieval in the GlobalSign Atlas CLI. The goal was to eliminate manual intervention, enforce validity compliance, and improve reliability, observability, and maintainability.
+
+
+## Key Enhancements
+
+### 1.  Dynamic `not_before` Injection
+
+* Automatically generates a UTC Unix timestamp at runtime.
+* Injected into the request payload before submission.
+* Ensures compliance with Atlas validation policy (±180 seconds skew).
+
+**Before**
+
+```json
+"validity": {
+  "not_before": 1656192000
+}
+```
+
+**After (runtime-generated)**
+
+```json
+"validity": {
+  "not_before": 1776837000
+}
+```
+
+
+
+### 2.  Optional `not_after` Automation
+
+* You can now input certificate validity in **days**.
+* Script converts days → UTC Unix timestamp.
+* Automatically injects `validity.not_after`.
+
+**Behavior**
+
+| Input       | Result                             |
+| ----------- | ---------------------------------- |
+| `7`         | Sets `not_after = now + 7 days`    |
+| `10`        | Sets `not_after = now + 10 days`   |
+| blank / `0` | Omitted → Atlas applies max policy |
+
+---
+
+### 3.  JSON Normalization Layer
+
+Introduced a preprocessing layer to handle invalid JSON structures (e.g., multiline CSR).
+
+#### Problem
+
+Raw multiline CSR inside JSON breaks `jq`.
+
+#### Solution
+
+* Python-based normalization function:
+
+  * Converts multiline `public_key` → escaped `\n` string
+  * Ensures valid JSON before processing
+  * Injects runtime values (`not_before`, `not_after`)
+
+#### Result
+
+* No more manual CSR escaping
+* Prevents `jq` parsing failures
+* Fully automated payload sanitation
+
+
+
+### 4. Immutable Request Template (Best Practice)
+
+* `request.json` is now treated as a **read-only template**
+* Runtime modifications are applied to a **temporary file**
+
+**Flow**
+
+```
+request.json (template)
+        ↓
+normalize_request_json()
+        ↓
+temp file (/tmp/...)
+        ↓
+API request
+```
+
+#### WHY?
+
+* Prevents accidental corruption
+* Enables safe reuse
+* Improves debugging and traceability
+
+
+### 5. Temporary File Handling & Cleanup
+
+* Improved `mktemp` for runtime request payloads
+* Added cleanup integration:
+
+```bash
+"${NORMALIZED_REQUEST_JSON:-}"
+```
+
+#### WHY?
+
+* No leftover temp files
+* Clean execution environment
+
+
+
+### 6. Debug Visibility Improvements
+
+Added runtime logging:
+
+```bash
+print_info "Injected not_before (UTC): ..."
+print_info "Injected not_after (UTC): ..."
+print_info "Using temp request file: ..."
+```
+
+#### WHY?
+
+* Full transparency of payload behavior
+* Easier debugging
+* Faster issue diagnosis
+
+
+### 7. Manual Certificate Retrieval – Auto Save
+
+Enhanced `get_certificate_by_id()` to behave like auto issuance.
+
+#### New Behavior
+
+* Saves certificate PEM:
+
+```
+./output/<cert_id>.crt
+```
+
+* Saves raw response:
+
+```
+./output/<cert_id>.json
+```
+
+#### WHY?
+
+* Consistent output handling
+* Eliminates manual copy/paste
+* Improves auditability
+
+
+
+### 8. Strict Error Handling (Production Safe)
+
+* Enforced validation for:
+
+  * JSON parsing failures
+  * invalid user input
+  * API errors
+
+* Script halts safely instead of proceeding with bad data.
+
+---
+
+### 9. `set -u` Compatibility Fixes
+
+* Ensured all variables are properly declared before use
+* Fixed unbound variable issues in:
+
+  * `request_new_certificate()`
+
+
+
+
+
+
+## Updated Workflows
+
+### 🔹 Auto Issuance Flow
+
+```mermaid
+flowchart TD
+    A[User runs Auto Issuance] --> B[Load request.json template]
+    B --> C[Generate UTC not_before]
+    C --> D[Optional: Input not_after days]
+    D --> E[Normalize JSON + Escape CSR]
+    E --> F[Create Temp Request File]
+    F --> G[Submit Certificate Request]
+    G --> H{HTTP Success?}
+
+    H -- No --> I[Display Error Response]
+    H -- Yes --> J[Extract Certificate ID]
+
+    J --> K[Poll Certificate Status]
+    K --> L{Certificate Ready?}
+
+    L -- No --> K
+    L -- Yes --> M[Save Certificate (.crt)]
+    M --> N[Retrieve Trust Chain]
+    N --> O[Save Chain + Fullchain]
+    O --> P[Cleanup Temp Files]
+```
+
+
+### 🔹 Manual Request Flow
+
+```mermaid
+flowchart TD
+    A[User selects Request Certificate] --> B[Load request.json template]
+    B --> C[Generate UTC not_before]
+    C --> D[Optional: Input not_after days]
+    D --> E[Normalize JSON + Escape CSR]
+    E --> F[Create Temp Request File]
+    F --> G[Submit Request to API]
+    G --> H[Display API Response]
+    H --> I[Cleanup Temp Files]
+```
+
+---
+
+### 🔹 Manual Retrieval Flow
+
+```mermaid
+flowchart TD
+    A[User enters Certificate ID] --> B[Call GET /certificates/{id}]
+    B --> C{HTTP 200?}
+
+    C -- No --> D[Display Error]
+    C -- Yes --> E[Parse Response JSON]
+
+    E --> F{Certificate Present?}
+    F -- No --> G[Save JSON Only]
+    F -- Yes --> H[Save Certificate (.crt)]
+
+    H --> I[Save JSON Response]
+    G --> I
+
+    I --> J[Store in ./output]
+```
+
+
+
+## ⚠️ Validation Policy Awareness
+
+Ensure inputs respect your Atlas validation policy for reference:
+
+```json
+"secondsmax": 2678400
+```
+
+➡️ Max validity = **31 days**
+
+
+
+## Resulting Improvements
+
+| Area            | Improvement              |
+| --------------- | ------------------------ |
+| Automation      | Fully dynamic timestamps |
+| Reliability     | No invalid JSON issues   |
+| UX              | Reduced manual steps     |
+| Debugging       | Clear runtime visibility |
+| Safety          | Immutable templates      |
+| Output Handling | Consistent file storage  |
+
+
+
 
 
 # Summary
