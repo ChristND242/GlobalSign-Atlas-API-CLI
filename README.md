@@ -888,7 +888,7 @@ flowchart TD
     K --> L{Certificate Ready?}
 
     L -- No --> K
-    L -- Yes --> M[Save Certificate (.crt)]
+    L -- Yes --> M["Save Certificate (.crt)"]
     M --> N[Retrieve Trust Chain]
     N --> O[Save Chain + Fullchain]
     O --> P[Cleanup Temp Files]
@@ -915,7 +915,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[User enters Certificate ID] --> B[Call GET /certificates/{id}]
+    A[User enters Certificate ID] --> B["Call GET /certificates/{id}"]
     B --> C{HTTP 200?}
 
     C -- No --> D[Display Error]
@@ -923,7 +923,7 @@ flowchart TD
 
     E --> F{Certificate Present?}
     F -- No --> G[Save JSON Only]
-    F -- Yes --> H[Save Certificate (.crt)]
+    F -- Yes --> H["Save Certificate (.crt)"]
 
     H --> I[Save JSON Response]
     G --> I
