@@ -206,7 +206,7 @@ ensure_config() {
   require_cmd sed
   require_cmd python3
 
-  prompt_if_empty BASE_URL "Enter BASE_URL [e.g. https://stg-emea.api.hvca.globalsign.com:8443/v2]"
+  prompt_if_empty BASE_URL "Enter BASE_URL [e.g. https://emea.api.hvca.globalsign.com:8443/v2]"
   prompt_if_empty MTLS_CERT "Enter path to mTLS certificate file"
   prompt_if_empty MTLS_KEY "Enter path to mTLS private key file"
   prompt_if_empty API_KEY "Enter your API_KEY" true
