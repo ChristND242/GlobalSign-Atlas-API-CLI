@@ -1,6 +1,6 @@
 {
   "signature": {
-    "algorithm": "RSA-PSS",
+    "algorithm": "RSA",
     "hash_algorithm": "SHA-256"
   },
   "public_key": "-----BEGIN PUBLIC KEY-----\\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwU2imlDf02o8DPveLN73\\nwbrQKScch9AnkMuQqBxxq5YBUAvPDXYeeA8tkgk+N2Q5FNL/BXI0m1QTlq8FbdAQ\\nKkpi93vimsymHpkBFTxZSqMcI55vyLanjfMOnZ7Xbgq0hhub/K6FZpFCJ2oqoLwr\\nY5hBYAGYQco5qw4nbR9Mpeu41QGQzrGjYIKNOVgXh/m41FOGDsQntecaLAluTg+E\\n/Qmb8U7XZVBn3/DPyiXrfobuBlnmEbPjQ95LAvRLzcHzWY0YB1dfGzbcK1PaGRLE\\nod2C1QCGK+YWzeUWEyHqgNEncQDMFYFKUd1IhR6OSmVB1ukXa0y8eZBVWsoxXr2X\\nlQIDAQAB\\n-----END PUBLIC KEY-----",
