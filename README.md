@@ -143,6 +143,83 @@ Setting these values as environment variables ensures they are available to the 
 
 This approach helps keep sensitive information out of the source code, reducing the risk of accidental exposure (for example, through version control). It also promotes better separation between configuration and code, making the tool easier to manage across different environments. 
 
+You can create an `.env` then reference the `API_KEY` and `API_SECRET` inside. If the `.env` file exits and not empty the script will fetch data from it, but in case the file doesn't exist you will be prompted to enter the credentials.
+
+### Remark
+You can easily run into this issue:
+
+`Logging in to Atlas... Login failed. HTTP 400 Response body: {"description":"Bad Request"}`
+
+The `.env` load itself is working. The **HTTP 400** means Atlas received a login request it did not like. So the most likely problem is that the values coming from `.env` are not exactly the same as what you used to type manually.
+
+Use this `.env` format:
+
+```bash
+API_KEY=your_actual_api_key
+API_SECRET=your_actual_api_secret
+```
+
+Not this:
+
+```bash
+API_KEY="your_actual_api_key"
+API_SECRET="your_actual_api_secret"
+```
+
+Quotes usually work in Bash, but depending on copy/paste, hidden characters can sneak in. Also avoid this:
+
+```bash
+API_KEY = your_actual_api_key
+API_SECRET = your_actual_api_secret
+```
+
+That is invalid for shell-style `.env`.
+
+The big suspects are:
+
+```bash
+API_KEY=abc123
+API_SECRET=xyz789
+```
+
+Against Windows line endings:
+
+```bash
+API_KEY=abc123\r
+API_SECRET=xyz789\r
+```
+
+That invisible `\r` is a classic “everything looks right but auth breaks” villain.
+
+Run this to check your `.env`:
+
+```bash
+cat -vet .env
+```
+
+You want to see something like:
+
+```bash
+API_KEY=abc123$
+API_SECRET=xyz789$
+```
+
+If you see `^M`, you have Windows line endings:
+
+```bash
+API_KEY=abc123^M$
+API_SECRET=xyz789^M$
+```
+
+Fix:
+
+```bash
+sed -i 's/\r$//' .env
+```
+
+
+
+
 
 
 
