@@ -14,6 +14,18 @@ set -euo pipefail
 # ============================================================
 
 # =========================
+# Load .env file
+# =========================
+
+if [ -f .env ]; then
+  set -a
+  source .env
+  set +a
+else
+  echo ".env file not found or empty. Continuing with prompt input..."
+fi
+
+# =========================
 # Config
 # =========================
 
