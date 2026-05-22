@@ -175,22 +175,12 @@ API_SECRET = your_actual_api_secret
 
 That is invalid for shell-style `.env`.
 
-The big suspects are:
-
-```bash
-API_KEY=abc123
-API_SECRET=xyz789
-```
-
-Against Windows line endings:
+The big issue can be the invisible `\r` Windows line endings:
 
 ```bash
 API_KEY=abc123\r
 API_SECRET=xyz789\r
 ```
-
-That invisible `\r` is a classic “everything looks right but auth breaks” villain.
-
 Run this to check your `.env`:
 
 ```bash
